@@ -7,17 +7,36 @@ import (
 	"log"
 	"net/http"
 	"os"
+
 	"strconv"
 	"strings"
 	"time"
 )
 
-func main() {
-	const url = "http://api.open-notify.org/iss-pass.json"
-	lat := 51.467
-	lon := -0.0145
+func curl(location string) (float64, float64) {
+	var lat, lon float64
+	urlFull := strings.Join([]string{"https://geocode.xyz/", location,"?geoit=csv"},"")
+	response, err := http.Get(urlFull)
+	responseData, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		log.Fatalf("Curl function error", err)
+	}
+    
+	stringifyResponse := string(responseData)
+	latLonArray := strings.Split(stringifyResponse, ",")
+	//fmt.Println(latLonArray)
+	lat,_ = strconv.ParseFloat(latLonArray[2],64)
+	lon,_ = strconv.ParseFloat(latLonArray[3],64)
+	return lat, lon
+}
 
-	urlFull := strings.Join([]string{url, "?", "lat=", strconv.FormatFloat(lat, 'f', 4, 64), "&lon=", strconv.FormatFloat(lon, 'f', 4, 64)}, "")
+
+func main() {
+
+	const urlISS = "http://api.open-notify.org/iss-pass.json"
+	lat, lon  := curl(os.Args[1])
+	urlFull := strings.Join([]string{urlISS, "?", "lat=", strconv.FormatFloat(lat, 'f', 4, 64), "&lon=", strconv.FormatFloat(lon, 'f', 4, 64)}, "")
+
 	response, err := http.Get(urlFull)
 	if err != nil {
 		fmt.Print(err.Error())
@@ -33,12 +52,11 @@ func main() {
 	var responseObject BigResponse
 	json.Unmarshal(responseData, &responseObject)
 
-	fmt.Println("API fetch status: ", responseObject.Message)
 	fmt.Println("Your longitude: ", responseObject.Request.Longitude)
 	fmt.Println("Your latitude: ", responseObject.Request.Latitude)
-	fmt.Println("Default number of passes: ", responseObject.Request.Passes)
+	fmt.Println("Number of passes requested: ", responseObject.Request.Passes)
 	for k, _ := range responseObject.Response {
-		fmt.Println("You will see the ISS next for a total of ", responseObject.Response[k].Duration/60, " mins duration and it will begin to show at ", time.Unix(responseObject.Response[k].Risetime, 0))
+		fmt.Println("Next ISS sighting for ", responseObject.Response[k].Duration/60, "mins at ", time.Unix(responseObject.Response[k].Risetime, 0))
 	}
 }
 
