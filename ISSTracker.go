@@ -13,17 +13,27 @@ import (
 	"time"
 )
 
-func curl(location string) (float64, float64) {
+func handleMyErrors(e error, text string) {
+	if e != nil {
+	log.Fatalf(text, e)
+    }
+}
+
+func getCoordinates(location string) (float64, float64) {
+	//Takes a location and returns latitude, longitude coordinates as float by querying API
+	const siteAPI = "https://geocode.xyz/"
+	const siteAPISuffix = "?geoit=csv"
 	var lat, lon float64
-	urlFull := strings.Join([]string{"https://geocode.xyz/", location,"?geoit=csv"},"")
+	urlFull := strings.Join([]string{siteAPI, location, siteAPISuffix},"")
+	
+	
 	response, err := http.Get(urlFull)
+	handleMyErrors(err, "http.Get issue in getCoordinates function")
+
 	responseData, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		log.Fatalf("Curl function error", err)
-	}
+	handleMyErrors(err, "ioutil.ReadAll issue in getCoordinates function ")
     
-	stringifyResponse := string(responseData)
-	latLonArray := strings.Split(stringifyResponse, ",")
+	latLonArray := strings.Split(string(responseData), ",")
 	//fmt.Println(latLonArray)
 	lat,_ = strconv.ParseFloat(latLonArray[2],64)
 	lon,_ = strconv.ParseFloat(latLonArray[3],64)
@@ -31,30 +41,29 @@ func curl(location string) (float64, float64) {
 }
 
 
+
+
 func main() {
 
 	const urlISS = "http://api.open-notify.org/iss-pass.json"
-	lat, lon  := curl(os.Args[1])
+	lat, lon  := getCoordinates(os.Args[1])
 	urlFull := strings.Join([]string{urlISS, "?", "lat=", strconv.FormatFloat(lat, 'f', 4, 64), "&lon=", strconv.FormatFloat(lon, 'f', 4, 64)}, "")
 
 	response, err := http.Get(urlFull)
-	if err != nil {
-		fmt.Print(err.Error())
-		os.Exit(1)
-	}
+	handleMyErrors(err, "http.Get issue in main function ")
+	
 
 	responseData, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	//fmt.Println(string(responseData))
+	handleMyErrors(err, "ioutil.ReadAll issue in main function ")
+
 
 	var responseObject BigResponse
 	json.Unmarshal(responseData, &responseObject)
 
-	fmt.Println("Your longitude: ", responseObject.Request.Longitude)
-	fmt.Println("Your latitude: ", responseObject.Request.Latitude)
-	fmt.Println("Number of passes requested: ", responseObject.Request.Passes)
+    fmt.Println("Location : ", os.Args[1])
+	fmt.Println("Longitude: ", responseObject.Request.Longitude)
+	fmt.Println("Latitude : ", responseObject.Request.Latitude)
+	fmt.Println("Number of ISS sightings requested: ", responseObject.Request.Passes)
 	for k, _ := range responseObject.Response {
 		fmt.Println("Next ISS sighting for ", responseObject.Response[k].Duration/60, "mins at ", time.Unix(responseObject.Response[k].Risetime, 0))
 	}
